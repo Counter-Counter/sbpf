@@ -9,7 +9,7 @@ use crate::{
 };
 use std::{
     array,
-    cell::{Cell, UnsafeCell},
+    cell::{Cell, RefCell, UnsafeCell},
     fmt, mem,
     ops::Range,
     ptr,
@@ -33,6 +33,8 @@ use std::{
 */
 
 /// Callback executed before generate_access_violation()
+///
+/// Safety: Reentrancy and reading the MemoryMapping are forbidden.
 pub type MemoryCowCallback = Box<dyn Fn(u32) -> Result<u64, ()>>;
 /// Fail always
 #[allow(clippy::result_unit_err)]
@@ -46,7 +48,9 @@ macro_rules! access_violation_guard {
                 return ProgramResult::Ok(host_addr);
             }
             if region.cow_callback_payload != u32::MAX {
-                if let Ok(new_host_addr) = (&$self.cow_cb)(region.cow_callback_payload) {
+                let cow_cb = &$self.cow_cb.borrow_mut();
+                if let Ok(new_host_addr) = cow_cb(region.cow_callback_payload)
+                {
                     region.host_addr.replace(new_host_addr);
                     region.writable.replace(true);
                     if let Some(host_addr) = region.vm_to_host($access_type, $vm_addr, $len) {
@@ -207,7 +211,7 @@ pub struct UnalignedMemoryMapping<'a> {
     /// Executable sbpf_version
     sbpf_version: SBPFVersion,
     /// Access violation handler
-    cow_cb: MemoryCowCallback,
+    cow_cb: RefCell<MemoryCowCallback>,
 }
 
 impl fmt::Debug for UnalignedMemoryMapping<'_> {
@@ -258,7 +262,7 @@ impl<'a> UnalignedMemoryMapping<'a> {
             cache: UnsafeCell::new(MappingCache::new()),
             config,
             sbpf_version,
-            cow_cb,
+            cow_cb: RefCell::new(cow_cb),
         };
         result.construct_eytzinger_order(0, 0);
         Ok(result)
@@ -348,7 +352,7 @@ pub struct AlignedMemoryMapping<'a> {
     /// Executable sbpf_version
     sbpf_version: SBPFVersion,
     /// Access violation handler
-    cow_cb: MemoryCowCallback,
+    cow_cb: RefCell<MemoryCowCallback>,
 }
 
 impl fmt::Debug for AlignedMemoryMapping<'_> {
@@ -384,7 +388,7 @@ impl<'a> AlignedMemoryMapping<'a> {
             regions: regions.into_boxed_slice(),
             config,
             sbpf_version,
-            cow_cb,
+            cow_cb: RefCell::new(cow_cb),
         })
     }
 
