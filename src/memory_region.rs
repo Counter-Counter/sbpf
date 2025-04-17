@@ -35,10 +35,17 @@ use std::{
 /// Callback executed before generate_access_violation()
 ///
 /// Safety: Reentrancy is forbidden.
-pub type MemoryCowCallback = Box<dyn Fn(&mut MemoryRegion)>;
+pub type MemoryCowCallback = Box<dyn Fn(&mut MemoryRegion, u64, AccessType, u64, u64)>;
 /// Fail always
 #[allow(clippy::result_unit_err)]
-pub fn default_memory_cow_callback(_region: &mut MemoryRegion) {}
+pub fn default_memory_cow_callback(
+    _region: &mut MemoryRegion,
+    _region_max_len: u64,
+    _access_type: AccessType,
+    _vm_addr: u64,
+    _len: u64,
+) {
+}
 macro_rules! access_violation_guard {
     ($self_ty:ty, $self:expr, $access_type:expr, $vm_addr:expr, $len:expr) => {{
         if let Some((index, region)) = $self.find_region($vm_addr) {
@@ -48,8 +55,13 @@ macro_rules! access_violation_guard {
             {
                 // Safety: The RefCell prevents reentrancy in MemoryCowCallback.
                 let cow_cb = $self.cow_cb.borrow_mut();
+                let max_len = $self
+                    .regions
+                    .get(index.saturating_add(1))
+                    .map_or(u64::MAX, |next_region| next_region.vm_addr)
+                    .saturating_sub(region.vm_addr);
                 let mut region = (*region).clone();
-                (&cow_cb)(&mut region);
+                (&cow_cb)(&mut region, max_len, $access_type, $vm_addr, $len);
                 let mut_self = unsafe {
                     // Same as: &mut *(&raw const *$self).cast_mut()
                     &mut *(*($self as *const $self_ty).cast::<UnsafeCell<$self_ty>>()).get()
@@ -903,31 +915,19 @@ mod test {
         .unwrap();
         assert!(m.find_region(ebpf::MM_INPUT_START - 1).is_none());
         assert_eq!(
-            m.find_region(ebpf::MM_INPUT_START)
-                .unwrap()
-                .1
-                .host_addr,
+            m.find_region(ebpf::MM_INPUT_START).unwrap().1.host_addr,
             mem1.as_ptr() as u64
         );
         assert_eq!(
-            m.find_region(ebpf::MM_INPUT_START + 3)
-                .unwrap()
-                .1
-                .host_addr,
+            m.find_region(ebpf::MM_INPUT_START + 3).unwrap().1.host_addr,
             mem1.as_ptr() as u64
         );
         assert_eq!(
-            m.find_region(ebpf::MM_INPUT_START + 4)
-                .unwrap()
-                .1
-                .host_addr,
+            m.find_region(ebpf::MM_INPUT_START + 4).unwrap().1.host_addr,
             mem2.as_ptr() as u64
         );
         assert_eq!(
-            m.find_region(ebpf::MM_INPUT_START + 7)
-                .unwrap()
-                .1
-                .host_addr,
+            m.find_region(ebpf::MM_INPUT_START + 7).unwrap().1.host_addr,
             mem2.as_ptr() as u64
         );
         assert!(m.find_region(ebpf::MM_INPUT_START + 8).is_some());
@@ -953,10 +953,7 @@ mod test {
         .unwrap();
         assert!(m.find_region(ebpf::MM_RODATA_START - 1).is_none());
         assert_eq!(
-            m.find_region(ebpf::MM_RODATA_START)
-                .unwrap()
-                .1
-                .host_addr,
+            m.find_region(ebpf::MM_RODATA_START).unwrap().1.host_addr,
             mem1.as_ptr() as u64
         );
         assert_eq!(
@@ -968,17 +965,11 @@ mod test {
         );
         assert!(m.find_region(ebpf::MM_RODATA_START + 4).is_some());
         assert_eq!(
-            m.find_region(ebpf::MM_STACK_START)
-                .unwrap()
-                .1
-                .host_addr,
+            m.find_region(ebpf::MM_STACK_START).unwrap().1.host_addr,
             mem2.as_ptr() as u64
         );
         assert_eq!(
-            m.find_region(ebpf::MM_STACK_START + 3)
-                .unwrap()
-                .1
-                .host_addr,
+            m.find_region(ebpf::MM_STACK_START + 3).unwrap().1.host_addr,
             mem2.as_ptr() as u64
         );
         assert!(m.find_region(ebpf::MM_INPUT_START + 4).is_none());
@@ -1264,7 +1255,7 @@ mod test {
                 vec![MemoryRegion::new_readonly(&original, ebpf::MM_RODATA_START)],
                 &config,
                 SBPFVersion::V3,
-                Box::new(move |region| {
+                Box::new(move |region, _, _, _, _| {
                     c.borrow_mut().extend_from_slice(&original);
                     region.host_addr = c.borrow().as_slice().as_ptr() as u64;
                     region.writable = true;
@@ -1298,7 +1289,7 @@ mod test {
                 vec![MemoryRegion::new_readonly(&original, ebpf::MM_RODATA_START)],
                 &config,
                 SBPFVersion::V3,
-                Box::new(move |region| {
+                Box::new(move |region, _, _, _, _| {
                     c.borrow_mut().extend_from_slice(&original);
                     region.host_addr = c.borrow().as_slice().as_ptr() as u64;
                     region.writable = true;
@@ -1344,7 +1335,7 @@ mod test {
                 regions,
                 &config,
                 SBPFVersion::V3,
-                Box::new(move |region| {
+                Box::new(move |region, _, _, _, _| {
                     // check that the argument passed to MemoryRegion::new_readonly is then passed to the
                     // callback
                     assert_eq!(region.cow_callback_payload, 42);
@@ -1371,7 +1362,7 @@ mod test {
             vec![MemoryRegion::new_readonly(&original, ebpf::MM_RODATA_START)],
             &config,
             SBPFVersion::V3,
-            Box::new(|_| ()),
+            Box::new(|_, _, _, _, _| ()),
         )
         .unwrap();
 
@@ -1388,7 +1379,7 @@ mod test {
             vec![MemoryRegion::new_readonly(&original, ebpf::MM_RODATA_START)],
             &config,
             SBPFVersion::V3,
-            Box::new(|_| ()),
+            Box::new(|_, _, _, _, _| ()),
         )
         .unwrap();
 
