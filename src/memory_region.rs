@@ -97,7 +97,7 @@ pub struct MemoryRegion {
     /// Is `AccessType::Store` allowed without triggering an access violation
     pub writable: bool,
     /// User defined payload for the [AccessViolationHandler]
-    pub access_violation_handler_payload: u32,
+    pub access_violation_handler_payload: Option<u16>,
 }
 
 impl MemoryRegion {
@@ -115,7 +115,7 @@ impl MemoryRegion {
             len: slice.len() as u64,
             vm_gap_shift,
             writable,
-            access_violation_handler_payload: u32::MAX,
+            access_violation_handler_payload: None,
         }
     }
 
@@ -183,13 +183,14 @@ impl fmt::Debug for MemoryRegion {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "host_addr: {:#x?}-{:#x?}, vm_addr: {:#x?}-{:#x?}, len: {}, writable: {}",
+            "host_addr: {:#x?}-{:#x?}, vm_addr: {:#x?}-{:#x?}, len: {}, writable: {}, payload {:?}",
             self.host_addr,
             self.host_addr.saturating_add(self.len),
             self.vm_addr,
             self.vm_addr_range().end,
             self.len,
             self.writable,
+            self.access_violation_handler_payload,
         )
     }
 }
@@ -1338,7 +1339,7 @@ mod test {
                 MemoryRegion::new_readonly(&original1, ebpf::MM_RODATA_START),
                 MemoryRegion::new_readonly(&original2, ebpf::MM_RODATA_START + 0x100000000),
             ];
-            regions[0].access_violation_handler_payload = 42;
+            regions[0].access_violation_handler_payload = Some(42);
 
             let c = Rc::clone(&copied);
             let mut m = MemoryMapping::new_with_access_violation_handler(
@@ -1348,7 +1349,7 @@ mod test {
                 Box::new(move |region, _, _, _, _| {
                     // check that the argument passed to MemoryRegion::new_readonly is then passed to the
                     // callback
-                    assert_eq!(region.access_violation_handler_payload, 42);
+                    assert_eq!(region.access_violation_handler_payload, Some(42));
                     c.borrow_mut().extend_from_slice(&original1);
                     region.host_addr = c.borrow().as_slice().as_ptr() as u64;
                     region.writable = true;
