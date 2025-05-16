@@ -7,13 +7,7 @@ use crate::{
     program::SBPFVersion,
     vm::Config,
 };
-use std::{
-    array,
-    cell::{RefCell, UnsafeCell},
-    fmt, mem,
-    ops::Range,
-    ptr,
-};
+use std::{array, cell::RefCell, fmt, mem, ops::Range, ptr};
 
 /* Explanation of the Gapped Memory
 
@@ -52,12 +46,12 @@ macro_rules! access_violation_guard {
             if let Some(host_addr) = region.vm_to_host($access_type, $vm_addr, $len) {
                 return ProgramResult::Ok(host_addr);
             }
+            let mut region = (*region).clone();
             let max_len = $self
                 .regions
                 .get(index.saturating_add(1))
                 .map_or(u64::MAX, |next_region| next_region.vm_addr)
                 .saturating_sub(region.vm_addr);
-            let mut region = (*region).clone();
             {
                 // Safety: The RefCell prevents reentrancy in AccessViolationHandler.
                 let access_violation_handler = $self.access_violation_handler.borrow_mut();
@@ -223,7 +217,7 @@ pub struct UnalignedMemoryMapping<'a> {
     /// Converts the Eytzinger order back to the original order
     region_index_lookup: Box<[usize]>,
     /// Cache of the last `MappingCache::SIZE` vm_addr => region_index lookups
-    cache: UnsafeCell<MappingCache>,
+    cache: MappingCache,
     /// VM configuration
     config: &'a Config,
     /// Executable sbpf_version
@@ -277,7 +271,7 @@ impl<'a> UnalignedMemoryMapping<'a> {
             regions: regions.into_boxed_slice(),
             region_addresses: vec![0; number_of_regions].into_boxed_slice(),
             region_index_lookup: vec![0; number_of_regions].into_boxed_slice(),
-            cache: UnsafeCell::new(MappingCache::new()),
+            cache: MappingCache::new(),
             config,
             sbpf_version,
             access_violation_handler: RefCell::new(access_violation_handler),
@@ -304,13 +298,8 @@ impl<'a> UnalignedMemoryMapping<'a> {
 
     /// Returns the `MemoryRegion` which may contain the given address.
     #[allow(clippy::arithmetic_side_effects)]
-    pub fn find_region(&self, vm_addr: u64) -> Option<(usize, &MemoryRegion)> {
-        // Safety:
-        // &mut references to the mapping cache are only created internally from methods that do not
-        // invoke each other. UnalignedMemoryMapping is !Sync, so the cache reference below is
-        // guaranteed to be unique.
-        let cache = unsafe { &mut *self.cache.get() };
-        if let Some(index) = cache.find(vm_addr) {
+    pub fn find_region(&mut self, vm_addr: u64) -> Option<(usize, &MemoryRegion)> {
+        if let Some(index) = self.cache.find(vm_addr) {
             // Safety:
             // Cached index, we validated it before caching it. See the corresponding safety section
             // in the miss branch.
@@ -334,7 +323,7 @@ impl<'a> UnalignedMemoryMapping<'a> {
             // must be contained in region
             index = unsafe { *self.region_index_lookup.get_unchecked(index - 1) };
             let region = unsafe { self.regions.get_unchecked(index) };
-            cache.insert(region.vm_addr_range(), index);
+            self.cache.insert(region.vm_addr_range(), index);
             Some((index, region))
         }
     }
@@ -355,7 +344,7 @@ impl<'a> UnalignedMemoryMapping<'a> {
             return Err(EbpfError::InvalidMemoryRegion(index));
         }
         self.regions[index] = region;
-        self.cache.get_mut().flush();
+        self.cache.flush();
         Ok(())
     }
 }
@@ -428,7 +417,7 @@ impl<'a> AlignedMemoryMapping<'a> {
 
     /// Returns the `MemoryRegion` which may contain the given address.
     #[inline]
-    pub fn find_region(&self, vm_addr: u64) -> Option<(usize, &MemoryRegion)> {
+    pub fn find_region(&mut self, vm_addr: u64) -> Option<(usize, &MemoryRegion)> {
         let index = vm_addr.wrapping_shr(ebpf::VIRTUAL_ADDRESS_BITS as u32) as usize;
         if (1..self.regions.len()).contains(&index) {
             // Safety: bounds check above
@@ -569,7 +558,7 @@ impl<'a> MemoryMapping<'a> {
     }
 
     /// Returns the `MemoryRegion` which may contain the given address.
-    pub fn find_region(&self, vm_addr: u64) -> Option<(usize, &MemoryRegion)> {
+    pub fn find_region(&mut self, vm_addr: u64) -> Option<(usize, &MemoryRegion)> {
         match self {
             MemoryMapping::Identity => None,
             MemoryMapping::Aligned(m) => m.find_region(vm_addr),
@@ -915,7 +904,7 @@ mod test {
 
         let mut mem1 = vec![0xFF; 4];
         let mem2 = vec![0xDD; 4];
-        let m = MemoryMapping::new(
+        let mut m = MemoryMapping::new(
             vec![
                 MemoryRegion::new_writable(&mut mem1, ebpf::MM_INPUT_START),
                 MemoryRegion::new_readonly(&mem2, ebpf::MM_INPUT_START + 4),
@@ -953,7 +942,7 @@ mod test {
 
         let mut mem1 = vec![0xFF; 4];
         let mem2 = vec![0xDD; 4];
-        let m = MemoryMapping::new(
+        let mut m = MemoryMapping::new(
             vec![
                 MemoryRegion::new_writable(&mut mem1, ebpf::MM_RODATA_START),
                 MemoryRegion::new_readonly(&mem2, ebpf::MM_STACK_START),
