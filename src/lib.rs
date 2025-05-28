@@ -9,11 +9,15 @@
 // the MIT license <http://opensource.org/licenses/MIT>, at your option. This file may not be
 // copied, modified, or distributed except according to those terms.
 
+// #![cfg_attr(any(target_arch = "riscv32", target_arch = "riscv64"), no_std)]
+#![no_std]
 //! Virtual machine for SBPF programs.
 #![warn(missing_docs)]
 #![allow(clippy::literal_string_with_formatting_args)]
 #![deny(clippy::arithmetic_side_effects)]
 #![deny(clippy::ptr_as_ptr)]
+
+extern crate alloc;
 
 extern crate byteorder;
 extern crate combine;

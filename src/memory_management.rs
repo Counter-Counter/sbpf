@@ -6,6 +6,8 @@
 
 #![cfg_attr(target_os = "windows", allow(dead_code))]
 
+use alloc::format;
+use alloc::vec;
 use crate::error::EbpfError;
 
 #[cfg(not(target_os = "windows"))]
@@ -94,7 +96,7 @@ pub fn round_to_page_size(value: usize, page_size: usize) -> usize {
 }
 
 pub unsafe fn allocate_pages(size_in_bytes: usize) -> Result<*mut u8, EbpfError> {
-    let mut raw: *mut c_void = std::ptr::null_mut();
+    let mut raw: *mut c_void = core::ptr::null_mut();
     #[cfg(not(target_os = "windows"))]
     libc_error_guard!(
         mmap,
