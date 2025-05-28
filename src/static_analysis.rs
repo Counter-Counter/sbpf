@@ -9,8 +9,10 @@ use crate::{
     program::SBPFVersion,
     vm::{ContextObject, DynamicAnalysis},
 };
+use alloc::{format, vec, vec::Vec, string::String};
 use rustc_demangle::demangle;
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use alloc::collections::{BTreeMap, BTreeSet,};
+use hashbrown::{HashMap, HashSet};
 
 /// Register state recorded after executing one instruction
 ///
@@ -36,13 +38,13 @@ impl Default for TopologicalIndex {
 }
 
 impl Ord for TopologicalIndex {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
         (self.scc_id.cmp(&other.scc_id)).then(self.discovery.cmp(&other.discovery))
     }
 }
 
 impl PartialOrd for TopologicalIndex {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
@@ -57,7 +59,7 @@ pub struct CfgNode {
     /// Successors which the end of this basic block can jump to
     pub destinations: Vec<usize>,
     /// Range of the instructions belonging to this basic block
-    pub instructions: std::ops::Range<usize>,
+    pub instructions: core::ops::Range<usize>,
     /// Topological index
     pub topo_index: TopologicalIndex,
     /// Immediate dominator (the last control flow junction)
@@ -194,7 +196,7 @@ impl<'a> Analysis<'a> {
         let mut result = Self {
             // Removes the generic ContextObject which is safe because we are not going to execute the program
             executable: unsafe {
-                std::mem::transmute::<&Executable<C>, &Executable<DummyContextObject>>(executable)
+                core::mem::transmute::<&Executable<C>, &Executable<DummyContextObject>>(executable)
             },
             instructions,
             functions,
@@ -314,7 +316,7 @@ impl<'a> Analysis<'a> {
         }
         {
             let mut cfg_nodes = BTreeMap::new();
-            std::mem::swap(&mut self.cfg_nodes, &mut cfg_nodes);
+            core::mem::swap(&mut self.cfg_nodes, &mut cfg_nodes);
             let mut cfg_nodes = cfg_nodes
                 .into_iter()
                 .filter(|(cfg_node_start, _cfg_node)| {
@@ -327,19 +329,19 @@ impl<'a> Analysis<'a> {
                     }
                 })
                 .collect();
-            std::mem::swap(&mut self.cfg_nodes, &mut cfg_nodes);
+            core::mem::swap(&mut self.cfg_nodes, &mut cfg_nodes);
             for cfg_edge in cfg_edges.values_mut() {
                 cfg_edge
                     .1
                     .retain(|destination| self.cfg_nodes.contains_key(destination));
             }
             let mut functions = BTreeMap::new();
-            std::mem::swap(&mut self.functions, &mut functions);
+            core::mem::swap(&mut self.functions, &mut functions);
             let mut functions = functions
                 .into_iter()
                 .filter(|(function_start, _)| self.cfg_nodes.contains_key(function_start))
                 .collect();
-            std::mem::swap(&mut self.functions, &mut functions);
+            core::mem::swap(&mut self.functions, &mut functions);
         }
         {
             let mut instruction_index = 0;
@@ -421,13 +423,13 @@ impl<'a> Analysis<'a> {
     }
 
     /// Generates labels for assembler code
-    pub fn disassemble_label<W: std::io::Write>(
+    pub fn disassemble_label<W: core::fmt::Write>(
         &self,
         output: &mut W,
         suppress_extra_newlines: bool,
         pc: usize,
         last_basic_block: &mut usize,
-    ) -> std::io::Result<()> {
+    ) -> alloc::fmt::Result {
         if let Some(cfg_node) = self.cfg_nodes.get(&pc) {
             let is_function = self.functions.contains_key(&pc);
             if is_function || cfg_node.sources != vec![*last_basic_block] {
@@ -459,7 +461,7 @@ impl<'a> Analysis<'a> {
     }
 
     /// Generates assembler code for the analyzed executable
-    pub fn disassemble<W: std::io::Write>(&self, output: &mut W) -> std::io::Result<()> {
+    pub fn disassemble<W: core::fmt::Write>(&self, output: &mut W) -> alloc::fmt::Result {
         let mut last_basic_block = usize::MAX;
         for (pc, insn) in self.instructions.iter().enumerate() {
             self.disassemble_label(
@@ -474,11 +476,11 @@ impl<'a> Analysis<'a> {
     }
 
     /// Use this method to print the trace log
-    pub fn disassemble_trace_log<W: std::io::Write>(
+    pub fn disassemble_trace_log<W: core::fmt::Write>(
         &self,
         output: &mut W,
         trace_log: &[TraceLogEntry],
-    ) -> Result<(), std::io::Error> {
+    ) -> alloc::fmt::Result {
         let mut pc_to_insn_index = vec![
             0usize;
             self.instructions
@@ -508,7 +510,7 @@ impl<'a> Analysis<'a> {
     /// Iterates over the cfg_nodes while providing the PC range of the function they belong to.
     pub fn iter_cfg_by_function(
         &self,
-    ) -> impl Iterator<Item = (std::ops::Range<usize>, usize, &CfgNode)> + '_ {
+    ) -> impl Iterator<Item = (core::ops::Range<usize>, usize, &CfgNode)> + '_ {
         let mut function_iter = self.functions.keys().peekable();
         let mut function_start = *function_iter.next().unwrap();
         self.cfg_nodes
@@ -527,11 +529,11 @@ impl<'a> Analysis<'a> {
     }
 
     /// Generates a graphviz DOT of the analyzed executable
-    pub fn visualize_graphically<W: std::io::Write>(
+    pub fn visualize_graphically<W: core::fmt::Write>(
         &self,
         output: &mut W,
         dynamic_analysis: Option<&DynamicAnalysis>,
-    ) -> std::io::Result<()> {
+    ) -> alloc::fmt::Result {
         fn html_escape(string: &str) -> String {
             string
                 .replace('&', "&amp;")
@@ -539,14 +541,14 @@ impl<'a> Analysis<'a> {
                 .replace('>', "&gt;")
                 .replace('\"', "&quot;")
         }
-        fn emit_cfg_node<W: std::io::Write>(
+        fn emit_cfg_node<W: core::fmt::Write>(
             output: &mut W,
             dynamic_analysis: Option<&DynamicAnalysis>,
             analysis: &Analysis,
-            function_range: std::ops::Range<usize>,
+            function_range: core::ops::Range<usize>,
             alias_nodes: &mut HashSet<usize>,
             cfg_node_start: usize,
-        ) -> std::io::Result<()> {
+        ) -> alloc::fmt::Result {
             let cfg_node = &analysis.cfg_nodes[&cfg_node_start];
             writeln!(output, "    lbb_{} [label=<<table border=\"0\" cellborder=\"0\" cellpadding=\"3\">{}</table>>];",
                 cfg_node_start,
@@ -856,13 +858,13 @@ impl<'a> Analysis<'a> {
                 .topo_index
                 .cmp(&self.cfg_nodes[&b].topo_index)
             {
-                std::cmp::Ordering::Greater => {
+                core::cmp::Ordering::Greater => {
                     b = self.cfg_nodes[&b].dominator_parent;
                 }
-                std::cmp::Ordering::Less => {
+                core::cmp::Ordering::Less => {
                     a = self.cfg_nodes[&a].dominator_parent;
                 }
-                std::cmp::Ordering::Equal => unreachable!(),
+                core::cmp::Ordering::Equal => unreachable!(),
             }
         }
         b
@@ -1098,7 +1100,7 @@ impl<'a> Analysis<'a> {
                     }
                 }
                 let mut deps = HashMap::new();
-                std::mem::swap(&mut deps, &mut state.2);
+                core::mem::swap(&mut deps, &mut state.2);
                 (*basic_block_start, deps)
             })
             .collect();
@@ -1123,7 +1125,7 @@ impl<'a> Analysis<'a> {
                 }
                 let basic_block = &self.cfg_nodes[basic_block_start];
                 let mut edges = BTreeSet::new();
-                std::mem::swap(
+                core::mem::swap(
                     self.dfg_forward_edges
                         .get_mut(&DfgNode::PhiNode(*basic_block_start))
                         .unwrap(),
@@ -1164,7 +1166,7 @@ impl<'a> Analysis<'a> {
                         continue_propagation = true;
                     }
                 }
-                std::mem::swap(reflective_edges, &mut edges);
+                core::mem::swap(reflective_edges, &mut edges);
             }
         }
         for (basic_block_start, basic_block) in self.cfg_nodes.iter() {

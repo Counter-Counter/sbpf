@@ -165,6 +165,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "hashbrown"
+version = "0.15.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "84b26c544d002229e640969970a2e74021aadf6e2f96372b9c58eff97de08eb3"
+
+[[package]]
 name = "hex"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -371,6 +377,7 @@ dependencies = [
  "elf",
  "gdbstub",
  "hash32",
+ "hashbrown",
  "json",
  "libc",
  "log",
