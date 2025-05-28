@@ -33,6 +33,14 @@ once_cell = "1.21.3"
 spin = "0.10.0"
 hashbrown = { version = "0.15.3", default-features = false }
 
+[dependencies.jam-pvm-common]
+version = "0.1.21"
+features = [
+    "service",
+    "logging",
+]
+default-features = false
+
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = ["memoryapi", "sysinfoapi", "winnt", "errhandlingapi"], optional = true }
 

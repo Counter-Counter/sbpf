@@ -5,7 +5,8 @@ use {
         elf::ElfError,
         vm::{Config, ContextObject, EbpfVm},
     },
-    std::collections::{btree_map::Entry, BTreeMap},
+    alloc::collections::{btree_map::Entry, BTreeMap},
+    alloc::{vec, vec::Vec},
 };
 
 /// Defines a set of sbpf_version of an executable
@@ -207,12 +208,12 @@ impl<T: Copy + PartialEq> FunctionRegistry<T> {
 
     /// Calculate memory size
     pub fn mem_size(&self) -> usize {
-        std::mem::size_of::<Self>().saturating_add(self.map.iter().fold(
+        core::mem::size_of::<Self>().saturating_add(self.map.iter().fold(
             0,
             |state: usize, (_, (name, value))| {
                 state.saturating_add(
-                    std::mem::size_of_val(value).saturating_add(
-                        std::mem::size_of_val(name).saturating_add(name.capacity()),
+                    core::mem::size_of_val(value).saturating_add(
+                        core::mem::size_of_val(name).saturating_add(name.capacity()),
                     ),
                 )
             },
@@ -275,9 +276,9 @@ impl<C: ContextObject> BuiltinProgram<C> {
 
     /// Calculate memory size
     pub fn mem_size(&self) -> usize {
-        std::mem::size_of::<Self>()
+        core::mem::size_of::<Self>()
             .saturating_add(if self.config.is_some() {
-                std::mem::size_of::<Config>()
+                core::mem::size_of::<Config>()
             } else {
                 0
             })
@@ -297,14 +298,14 @@ impl<C: ContextObject> BuiltinProgram<C> {
     }
 }
 
-impl<C: ContextObject> std::fmt::Debug for BuiltinProgram<C> {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+impl<C: ContextObject> alloc::fmt::Debug for BuiltinProgram<C> {
+    fn fmt(&self, f: &mut alloc::fmt::Formatter) -> Result<(), alloc::fmt::Error> {
         unsafe {
             writeln!(
                 f,
                 "registry: {:?}",
                 // `derive(Debug)` does not know that `C: ContextObject` does not need to implement `Debug`
-                std::mem::transmute::<
+                core::mem::transmute::<
                     &FunctionRegistry<BuiltinFunction<C>>,
                     &FunctionRegistry<usize>,
                 >(&self.sparse_registry),

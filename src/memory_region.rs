@@ -7,13 +7,15 @@ use crate::{
     program::SBPFVersion,
     vm::Config,
 };
-use std::{
+use core::{
     array,
     cell::{Cell, UnsafeCell},
     fmt, mem,
     ops::Range,
     ptr::{self, copy_nonoverlapping},
 };
+
+use alloc::{vec, vec::Vec};
 
 /* Explanation of the Gapped Memory
 
@@ -63,7 +65,7 @@ pub struct MemoryRegion {
 impl MemoryRegion {
     fn new(slice: &[u8], vm_addr: u64, vm_gap_size: u64, writable: bool) -> Self {
         let mut vm_addr_end = vm_addr.saturating_add(slice.len() as u64);
-        let mut vm_gap_shift = (std::mem::size_of::<u64>() as u8)
+        let mut vm_gap_shift = (core::mem::size_of::<u64>() as u8)
             .saturating_mul(8)
             .saturating_sub(1);
         if vm_gap_size > 0 {
@@ -143,13 +145,13 @@ impl fmt::Debug for MemoryRegion {
         )
     }
 }
-impl std::cmp::PartialOrd for MemoryRegion {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+impl core::cmp::PartialOrd for MemoryRegion {
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
-impl std::cmp::Ord for MemoryRegion {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+impl core::cmp::Ord for MemoryRegion {
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
         self.vm_addr.cmp(&other.vm_addr)
     }
 }
@@ -364,7 +366,7 @@ impl<'a> UnalignedMemoryMapping<'a> {
         let initial_len = len;
         let initial_vm_addr = vm_addr;
         let mut value = 0u64;
-        let mut ptr = std::ptr::addr_of_mut!(value).cast::<u8>();
+        let mut ptr = core::ptr::addr_of_mut!(value).cast::<u8>();
 
         while len > 0 {
             let load_len = len.min(region.vm_addr_end.saturating_sub(vm_addr));
@@ -415,7 +417,7 @@ impl<'a> UnalignedMemoryMapping<'a> {
         // guaranteed to be unique.
         let cache = unsafe { &mut *self.cache.get() };
 
-        let mut src = std::ptr::addr_of!(value).cast::<u8>();
+        let mut src = core::ptr::addr_of!(value).cast::<u8>();
 
         let mut region = match self.find_region(cache, vm_addr) {
             Some((_region_index, region)) if ensure_writable_region(region, &self.cow_cb) => {
