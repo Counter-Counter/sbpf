@@ -3,7 +3,7 @@
 pub mod consts;
 pub mod types;
 
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use core::{fmt, mem, ops::Range, slice};
 
 use crate::{ArithmeticOverflow, ErrCheckedArithmetic};
