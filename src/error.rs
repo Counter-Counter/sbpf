@@ -8,7 +8,8 @@
 
 use {
     crate::{elf::ElfError, memory_region::AccessType, verifier::VerifierError},
-    std::error::Error,
+    core::error::Error,
+    alloc::{vec::Vec, string::String}
 };
 
 /// Error definitions
@@ -84,7 +85,7 @@ pub enum StableResult<T, E> {
     Err(E),
 }
 
-impl<T: std::fmt::Debug, E: std::fmt::Debug> StableResult<T, E> {
+impl<T: alloc::fmt::Debug, E: alloc::fmt::Debug> StableResult<T, E> {
     /// `true` if `Ok`
     pub fn is_ok(&self) -> bool {
         match self {
@@ -142,7 +143,7 @@ impl<T: std::fmt::Debug, E: std::fmt::Debug> StableResult<T, E> {
         allow(dead_code)
     )]
     pub(crate) fn discriminant(&self) -> u64 {
-        unsafe { *std::ptr::addr_of!(*self).cast::<u64>() }
+        unsafe { *core::ptr::addr_of!(*self).cast::<u64>() }
     }
 }
 

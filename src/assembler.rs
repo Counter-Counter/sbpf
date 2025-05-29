@@ -25,7 +25,7 @@ use crate::{
 use std::collections::HashMap;
 
 #[cfg(not(feature = "shuttle-test"))]
-use std::sync::Arc;
+use core::sync::Arc;
 
 #[cfg(feature = "shuttle-test")]
 use shuttle::sync::Arc;
