@@ -10,6 +10,8 @@
 
 //! This module parses eBPF assembly language source code.
 
+use alloc::{format, string::{ToString, String}, vec::Vec};
+
 use combine::{
     attempt, between,
     char::{alpha_num, char, digit, hex_digit, spaces, string},
