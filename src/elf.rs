@@ -6,6 +6,8 @@
 // where the section headers may be removed from the ELF.  If that happens then
 // this loader will need to be re-written to use the program headers instead.
 
+use alloc::{format, string::{ToString, String}, vec, vec::Vec};
+
 use crate::{
     aligned_memory::{is_memory_aligned, AlignedMemory},
     ebpf::{self, EF_SBPF_V2, HOST_ALIGN, INSN_SIZE},
@@ -27,10 +29,11 @@ use crate::{
 #[cfg(all(feature = "jit", not(target_os = "windows"), target_arch = "x86_64"))]
 use crate::jit::{JitCompiler, JitProgram};
 use byteorder::{ByteOrder, LittleEndian};
-use std::{collections::BTreeMap, fmt::Debug, mem, ops::Range, str};
+use alloc::{collections::BTreeMap, fmt::Debug, str};
+use core::{mem, ops::Range};
 
 #[cfg(not(feature = "shuttle-test"))]
-use std::sync::Arc;
+use alloc::sync::Arc;
 
 #[cfg(feature = "shuttle-test")]
 use shuttle::sync::Arc;
@@ -139,7 +142,7 @@ fn get_section(elf: &Elf64, name: &[u8]) -> Result<Elf64Shdr, ElfError> {
     }
 
     Err(ElfError::SectionNotFound(
-        std::str::from_utf8(name)
+        alloc::str::from_utf8(name)
             .unwrap_or("UTF-8 error")
             .to_string(),
     ))
@@ -376,7 +379,7 @@ impl<C: ContextObject> Executable<C> {
         const E_FLAGS_OFFSET: usize = 48;
         let e_flags = LittleEndian::read_u32(
             bytes
-                .get(E_FLAGS_OFFSET..E_FLAGS_OFFSET.saturating_add(std::mem::size_of::<u32>()))
+                .get(E_FLAGS_OFFSET..E_FLAGS_OFFSET.saturating_add(core::mem::size_of::<u32>()))
                 .ok_or(ElfParserError::OutOfBounds)?,
         );
         let config = loader.get_config();
@@ -1348,10 +1351,10 @@ impl<C: ContextObject> Executable<C> {
     #[allow(dead_code)]
     fn dump_data(name: &str, prog: &[u8]) {
         let mut eight_bytes: Vec<u8> = Vec::new();
-        println!("{name}");
+        jam_pvm_common::info!("{name}");
         for i in prog.iter() {
             if eight_bytes.len() >= 7 {
-                println!("{eight_bytes:02X?}");
+                jam_pvm_common::info!("{eight_bytes:02X?}");
                 eight_bytes.clear();
             } else {
                 eight_bytes.push(*i);
