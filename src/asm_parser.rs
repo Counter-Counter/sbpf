@@ -181,6 +181,7 @@ pub fn parse(input: &str) -> Result<Vec<Statement>, String> {
 
 #[cfg(test)]
 mod tests {
+    use alloc::{string::{ToString}, vec};
     use super::{
         ident, instruction, integer, mnemonic, operand, parse, register, Operand, Statement,
     };

@@ -178,7 +178,7 @@ impl<const ALIGN: usize> Clone for AlignedMemory<ALIGN> {
     }
 }
 
-impl<const ALIGN: usize> AlignedMemory<ALIGN> {
+impl<const ALIGN: usize> crate::utils::Write for AlignedMemory<ALIGN> {
     fn write(&mut self, buf: &[u8]) -> Result<usize, InternalError> {
         match (
             self.mem.len().checked_add(buf.len()),
@@ -193,9 +193,6 @@ impl<const ALIGN: usize> AlignedMemory<ALIGN> {
         }
         self.mem.extend_from_slice(buf);
         Ok(buf.len())
-    }
-    fn flush(&mut self) -> Result<(), ()> {
-        Ok(())
     }
 }
 
@@ -215,7 +212,8 @@ pub fn is_memory_aligned(ptr: usize, align: usize) -> bool {
 #[allow(clippy::arithmetic_side_effects)]
 #[cfg(test)]
 mod tests {
-    use {super::*, std::io::Write};
+    use {super::*};
+    use crate::utils::Write;
 
     fn do_test<const ALIGN: usize>() {
         let mut aligned_memory = AlignedMemory::<ALIGN>::with_capacity(10);

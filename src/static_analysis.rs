@@ -2,6 +2,8 @@
 //! Static Byte Code Analysis
 
 use crate::disassembler::disassemble_instruction;
+use crate::error::InternalError;
+use crate::utils;
 use crate::{
     ebpf,
     elf::Executable,
@@ -9,7 +11,7 @@ use crate::{
     program::SBPFVersion,
     vm::{ContextObject, DynamicAnalysis},
 };
-use alloc::{format, vec, vec::Vec, string::String};
+use alloc::{format, vec, vec::Vec, string::{String, ToString}};
 use rustc_demangle::demangle;
 use alloc::collections::{BTreeMap, BTreeSet,};
 use hashbrown::{HashMap, HashSet};
@@ -423,13 +425,13 @@ impl<'a> Analysis<'a> {
     }
 
     /// Generates labels for assembler code
-    pub fn disassemble_label<W: core::fmt::Write>(
+    pub fn disassemble_label<W: crate::utils::Write>(
         &self,
         output: &mut W,
         suppress_extra_newlines: bool,
         pc: usize,
         last_basic_block: &mut usize,
-    ) -> alloc::fmt::Result {
+    ) -> Result<(), InternalError> {
         if let Some(cfg_node) = self.cfg_nodes.get(&pc) {
             let is_function = self.functions.contains_key(&pc);
             if is_function || cfg_node.sources != vec![*last_basic_block] {
@@ -461,7 +463,7 @@ impl<'a> Analysis<'a> {
     }
 
     /// Generates assembler code for the analyzed executable
-    pub fn disassemble<W: core::fmt::Write>(&self, output: &mut W) -> alloc::fmt::Result {
+    pub fn disassemble<W: crate::utils::Write>(&self, output: &mut W) -> Result<(), InternalError> {
         let mut last_basic_block = usize::MAX;
         for (pc, insn) in self.instructions.iter().enumerate() {
             self.disassemble_label(
@@ -476,11 +478,11 @@ impl<'a> Analysis<'a> {
     }
 
     /// Use this method to print the trace log
-    pub fn disassemble_trace_log<W: core::fmt::Write>(
+    pub fn disassemble_trace_log<W: utils::Write>(
         &self,
         output: &mut W,
         trace_log: &[TraceLogEntry],
-    ) -> alloc::fmt::Result {
+    ) -> Result<(), InternalError> {
         let mut pc_to_insn_index = vec![
             0usize;
             self.instructions
@@ -529,11 +531,11 @@ impl<'a> Analysis<'a> {
     }
 
     /// Generates a graphviz DOT of the analyzed executable
-    pub fn visualize_graphically<W: core::fmt::Write>(
+    pub fn visualize_graphically<W: crate::utils::Write>(
         &self,
         output: &mut W,
         dynamic_analysis: Option<&DynamicAnalysis>,
-    ) -> alloc::fmt::Result {
+    ) -> Result<(), InternalError> {
         fn html_escape(string: &str) -> String {
             string
                 .replace('&', "&amp;")
@@ -541,14 +543,14 @@ impl<'a> Analysis<'a> {
                 .replace('>', "&gt;")
                 .replace('\"', "&quot;")
         }
-        fn emit_cfg_node<W: core::fmt::Write>(
+        fn emit_cfg_node<W: crate::utils::Write>(
             output: &mut W,
             dynamic_analysis: Option<&DynamicAnalysis>,
             analysis: &Analysis,
             function_range: core::ops::Range<usize>,
             alias_nodes: &mut HashSet<usize>,
             cfg_node_start: usize,
-        ) -> alloc::fmt::Result {
+        ) -> Result<(), InternalError> {
             let cfg_node = &analysis.cfg_nodes[&cfg_node_start];
             writeln!(output, "    lbb_{} [label=<<table border=\"0\" cellborder=\"0\" cellpadding=\"3\">{}</table>>];",
                 cfg_node_start,

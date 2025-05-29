@@ -1,4 +1,5 @@
 //! Common interface for built-in and user supplied programs
+use alloc::boxed::Box;
 use {
     crate::{
         ebpf,
@@ -6,7 +7,7 @@ use {
         vm::{Config, ContextObject, EbpfVm},
     },
     alloc::collections::{btree_map::Entry, BTreeMap},
-    alloc::{vec, vec::Vec},
+    alloc::{vec::Vec},
 };
 
 /// Defines a set of sbpf_version of an executable

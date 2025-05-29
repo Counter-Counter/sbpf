@@ -6,6 +6,8 @@
 
 //! This module contains error and result types
 
+use alloc::boxed::Box;
+
 use {
     crate::{elf::ElfError, memory_region::AccessType, verifier::VerifierError},
     core::error::Error,
@@ -75,9 +77,10 @@ pub enum EbpfError {
     SyscallError(Box<dyn Error>),
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum InternalError {
     InvalidInput(String),
+    WriteAllEof,
 }
 
 /// Same as `Result` but provides a stable memory layout

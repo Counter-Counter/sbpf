@@ -47,7 +47,7 @@ static RUNTIME_ENVIRONMENT_KEY: OnceCell<Mutex<i32>> = OnceCell::new();
 /// Returns (and if not done before generates) the encryption key for the VM pointer
 pub fn get_runtime_environment_key() -> i32 {
     *RUNTIME_ENVIRONMENT_KEY
-        .get_or_init(|| Mutex::new(thread_rng().gen::<i32>() >> PROGRAM_ENVIRONMENT_KEY_SHIFT))
+        .get_or_init(|| Mutex::new(thread_rng().gen::<i32>() >> PROGRAM_ENVIRONMENT_KEY_SHIFT)).lock()
 }
 
 /// VM configuration settings

@@ -26,6 +26,7 @@ extern crate log;
 extern crate rand;
 extern crate thiserror;
 
+pub mod utils;
 pub mod aligned_memory;
 mod asm_parser;
 pub mod assembler;

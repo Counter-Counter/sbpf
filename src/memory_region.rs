@@ -1,5 +1,7 @@
 //! This module defines memory regions
 
+use alloc::boxed::Box;
+
 use crate::{
     aligned_memory::Pod,
     ebpf,
@@ -926,7 +928,9 @@ impl MappingCache {
 
 #[cfg(test)]
 mod test {
-    use std::{cell::RefCell, rc::Rc};
+    use alloc::rc::Rc;
+    use alloc::format;
+    use core::{cell::RefCell};
     use test_utils::assert_error;
 
     use super::*;
