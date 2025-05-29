@@ -7,6 +7,8 @@
 
 //! This module translates eBPF assembly language to binary.
 
+use alloc::{format, string::{ToString, String}, vec::Vec};
+
 use self::InstructionType::{
     AluBinary, AluUnary, CallImm, CallReg, Endian, JumpConditional, JumpUnconditional, LoadDwImm,
     LoadReg, NoOperand, StoreImm, StoreReg, Syscall,
@@ -22,10 +24,10 @@ use crate::{
     program::{BuiltinProgram, FunctionRegistry, SBPFVersion},
     vm::ContextObject,
 };
-use std::collections::HashMap;
+use hashbrown::HashMap;
 
 #[cfg(not(feature = "shuttle-test"))]
-use core::sync::Arc;
+use alloc::sync::Arc;
 
 #[cfg(feature = "shuttle-test")]
 use shuttle::sync::Arc;
