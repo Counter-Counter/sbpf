@@ -1,6 +1,8 @@
 //! Aligned memory
+use alloc::{string::ToString, vec, vec::Vec};
+use core::{mem, ptr};
 
-use std::{mem, ptr};
+use crate::error::InternalError;
 
 /// Scalar types, aka "plain old data"
 pub trait Pod {}
@@ -112,16 +114,15 @@ impl<const ALIGN: usize> AlignedMemory<ALIGN> {
         &mut self.mem[start..end]
     }
     /// Grows memory with `value` repeated `num` times starting at the `write_index`
-    pub fn fill_write(&mut self, num: usize, value: u8) -> std::io::Result<()> {
+    pub fn fill_write(&mut self, num: usize, value: u8) -> Result<(), InternalError> {
         let new_len = match (
             self.mem.len().checked_add(num),
             self.align_offset.checked_add(self.max_len),
         ) {
             (Some(new_len), Some(allocation_end)) if new_len <= allocation_end => new_len,
             _ => {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::InvalidInput,
-                    "aligned memory fill_write failed",
+                return Err(InternalError::InvalidInput(
+                    "aligned memory fill_write failed".to_string()
                 ))
             }
         };
@@ -177,24 +178,23 @@ impl<const ALIGN: usize> Clone for AlignedMemory<ALIGN> {
     }
 }
 
-impl<const ALIGN: usize> std::io::Write for AlignedMemory<ALIGN> {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+impl<const ALIGN: usize> AlignedMemory<ALIGN> {
+    fn write(&mut self, buf: &[u8]) -> Result<usize, InternalError> {
         match (
             self.mem.len().checked_add(buf.len()),
             self.align_offset.checked_add(self.max_len),
         ) {
             (Some(new_len), Some(allocation_end)) if new_len <= allocation_end => {}
             _ => {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::InvalidInput,
-                    "aligned memory write failed",
+                return Err(InternalError::InvalidInput(
+                    "aligned memory write failed".to_string()
                 ))
             }
         }
         self.mem.extend_from_slice(buf);
         Ok(buf.len())
     }
-    fn flush(&mut self) -> std::io::Result<()> {
+    fn flush(&mut self) -> Result<(), ()> {
         Ok(())
     }
 }

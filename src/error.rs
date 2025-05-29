@@ -75,6 +75,11 @@ pub enum EbpfError {
     SyscallError(Box<dyn Error>),
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum InternalError {
+    InvalidInput(String),
+}
+
 /// Same as `Result` but provides a stable memory layout
 #[derive(Debug)]
 #[repr(C, u64)]
