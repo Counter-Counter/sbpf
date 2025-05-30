@@ -8,6 +8,8 @@
 
 #![allow(dead_code)]
 
+use std::io::Write;
+
 use solana_sbpf::{
     aligned_memory::AlignedMemory,
     ebpf::{self, HOST_ALIGN},
@@ -16,9 +18,19 @@ use solana_sbpf::{
     memory_region::{MemoryCowCallback, MemoryMapping, MemoryRegion},
     static_analysis::TraceLogEntry,
     vm::ContextObject,
+    error::InternalError
 };
 
 pub mod syscalls;
+
+pub struct StdoutLockWrapper<'a>(pub std::io::StdoutLock<'a>);
+
+impl<'a> solana_sbpf::utils::Write for StdoutLockWrapper<'a> {
+    fn write(&mut self, buf: &[u8]) -> Result<usize, InternalError> {
+        self.0.write(buf)
+            .map_err(|err| InternalError::IoError(err.to_string()))
+    }
+}
 
 /// Simple instruction meter for testing
 #[derive(Debug, Clone, Default)]
@@ -351,12 +363,12 @@ macro_rules! test_interpreter_and_jit {
                         let stdout = std::io::stdout();
                         analysis
                             .disassemble_trace_log(
-                                &mut stdout.lock(),
+                                &mut test_utils::StdoutLockWrapper(stdout.lock()),
                                 &_tracer_interpreter.trace_log,
                             )
                             .unwrap();
                         analysis
-                            .disassemble_trace_log(&mut stdout.lock(), &tracer_jit.trace_log)
+                            .disassemble_trace_log(&mut test_utils::StdoutLockWrapper(stdout.lock()), &tracer_jit.trace_log)
                             .unwrap();
                         diverged = true;
                     }

@@ -81,6 +81,7 @@ pub enum EbpfError {
 pub enum InternalError {
     InvalidInput(String),
     WriteAllEof,
+    IoError(String)
 }
 
 /// Same as `Result` but provides a stable memory layout

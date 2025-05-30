@@ -3343,10 +3343,10 @@ fn execute_generated_program(prog: &[u8]) -> bool {
         println!("result_jit={result_jit:?}");
         let stdout = std::io::stdout();
         analysis
-            .disassemble_trace_log(&mut stdout.lock(), &tracer_interpreter.trace_log)
+            .disassemble_trace_log(&mut test_utils::StdoutLockWrapper(stdout.lock()), &tracer_interpreter.trace_log)
             .unwrap();
         analysis
-            .disassemble_trace_log(&mut stdout.lock(), &tracer_jit.trace_log)
+            .disassemble_trace_log(&mut test_utils::StdoutLockWrapper(stdout.lock()), &tracer_jit.trace_log)
             .unwrap();
         panic!();
     }

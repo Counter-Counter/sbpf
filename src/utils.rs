@@ -1,4 +1,4 @@
-use alloc::fmt;
+use alloc::{fmt, vec::Vec};
 use crate::error::InternalError;
 
 /// Alternative for std::io::Write
@@ -57,3 +57,11 @@ pub trait Write {
     }
 }
 
+impl Write for Vec<u8> {
+    fn write(&mut self, buf: &[u8]) -> Result<usize, InternalError> {
+        for b in buf {
+            self.push(*b);
+        };
+        Ok(buf.len())
+    }
+}
