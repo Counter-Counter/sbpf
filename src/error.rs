@@ -77,10 +77,14 @@ pub enum EbpfError {
     SyscallError(Box<dyn Error>),
 }
 
+/// crate's internal errors
 #[derive(Debug, Clone)]
 pub enum InternalError {
+    /// invalid input
     InvalidInput(String),
+    /// write all eof
     WriteAllEof,
+    /// io error
     IoError(String)
 }
 

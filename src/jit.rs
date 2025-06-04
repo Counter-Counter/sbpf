@@ -14,13 +14,13 @@
 #![allow(clippy::arithmetic_side_effects)]
 
 #[cfg(not(feature = "shuttle-test"))]
-use rand::{thread_rng, Rng};
+use rand::{Rng};
 
+use rand_distr::{Distribution, Uniform};
 #[cfg(feature = "shuttle-test")]
 use shuttle::rand::{thread_rng, Rng};
 
 use rand::{
-    distributions::{Distribution, Uniform},
     rngs::SmallRng,
     SeedableRng,
 };
@@ -394,8 +394,8 @@ impl<'a, C: ContextObject> JitCompiler<'a, C> {
         debug_assert!(code_length_estimate < (i32::MAX as usize));
 
         let runtime_environment_key = get_runtime_environment_key();
-        let mut diversification_rng = SmallRng::from_rng(thread_rng()).map_err(|_| EbpfError::JitNotCompiled)?;
-        let immediate_value_key = diversification_rng.gen::<i64>();
+        let mut diversification_rng = SmallRng::seed_from_u64(1);
+        let immediate_value_key = diversification_rng.random::<i64>();
 
         Ok(Self {
             result: JitProgram::new(pc, code_length_estimate)?,
@@ -408,8 +408,8 @@ impl<'a, C: ContextObject> JitCompiler<'a, C> {
             config,
             pc: 0,
             last_instruction_meter_validation_pc: 0,
-            next_noop_insertion: if config.noop_instruction_rate == 0 { u32::MAX } else { diversification_rng.gen_range(0..config.noop_instruction_rate * 2) },
-            noop_range: Uniform::new_inclusive(0, config.noop_instruction_rate * 2),
+            next_noop_insertion: if config.noop_instruction_rate == 0 { u32::MAX } else { diversification_rng.random_range(0..config.noop_instruction_rate * 2) },
+            noop_range: Uniform::new_inclusive(0, config.noop_instruction_rate * 2).map_err(|_err| EbpfError::JitNotCompiled)?,
             runtime_environment_key,
             immediate_value_key,
             diversification_rng,
@@ -421,7 +421,7 @@ impl<'a, C: ContextObject> JitCompiler<'a, C> {
     pub fn compile(mut self) -> Result<JitProgram, EbpfError> {
         // Randomized padding at the start before random intervals begin
         if self.config.noop_instruction_rate != 0 {
-            for _ in 0..self.diversification_rng.gen_range(0..MAX_START_PADDING_LENGTH) {
+            for _ in 0..self.diversification_rng.random_range(0..MAX_START_PADDING_LENGTH) {
                 // X86Instruction::noop().emit(self)?;
                 self.emit::<u8>(0x90);
             }

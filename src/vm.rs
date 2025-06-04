@@ -14,8 +14,7 @@
 
 use alloc::{vec, vec::Vec, collections::BTreeMap};
 use core::fmt::Debug;
-use once_cell::sync::OnceCell;
-use spin::Mutex;
+use spin;
 use crate::{
     ebpf,
     elf::Executable,
@@ -28,7 +27,7 @@ use crate::{
 
 #[cfg(not(feature = "shuttle-test"))]
 use {
-    rand::{thread_rng, Rng},
+    rand::{SeedableRng, rngs::SmallRng, Rng},
     alloc::sync::Arc
 };
 
@@ -42,12 +41,12 @@ use shuttle::{
 ///
 /// 3 bits for 8 Byte alignment, and 1 bit to have encoding space for the RuntimeEnvironment.
 const PROGRAM_ENVIRONMENT_KEY_SHIFT: u32 = 4;
-static RUNTIME_ENVIRONMENT_KEY: OnceCell<Mutex<i32>> = OnceCell::new();
+static RUNTIME_ENVIRONMENT_KEY: spin::Once<i32> = spin::Once::new();
 
 /// Returns (and if not done before generates) the encryption key for the VM pointer
 pub fn get_runtime_environment_key() -> i32 {
     *RUNTIME_ENVIRONMENT_KEY
-        .get_or_init(|| Mutex::new(thread_rng().gen::<i32>() >> PROGRAM_ENVIRONMENT_KEY_SHIFT)).lock()
+        .call_once(|| SmallRng::seed_from_u64(1).random::<i32>() >> PROGRAM_ENVIRONMENT_KEY_SHIFT)
 }
 
 /// VM configuration settings

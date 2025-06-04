@@ -10,17 +10,16 @@
 
 //! This module parses eBPF assembly language source code.
 
-use alloc::{format, string::{ToString, String}, vec::Vec};
+use alloc::{format, string::{String}, vec::Vec};
 
 use combine::{
     attempt, between,
-    char::{alpha_num, char, digit, hex_digit, spaces, string},
-    combine_parse_partial, combine_parser_impl,
-    easy::{Error, Errors, Info},
-    eof, many, many1, one_of, optional, parse_mode, parser, sep_by, skip_many,
-    stream::state::{SourcePosition, State},
+    parser::char::{alpha_num, char, digit, hex_digit, spaces, string},
+    eof, many, many1, one_of, optional, sep_by, skip_many,
+    stream::position::{self, SourcePosition},
     Parser, Stream,
 };
+use combine::parser;
 
 /// Operand of an instruction.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -53,19 +52,19 @@ pub enum Statement {
 }
 
 parser! {
-    fn ident[I]()(I) -> String where [I: Stream<Item=char>] {
+    fn ident[I]()(I) -> String where [I: Stream<Token=char>] {
         many1(alpha_num().or(char('_')))
     }
 }
 
 parser! {
-    fn mnemonic[I]()(I) -> String where [I: Stream<Item=char>] {
+    fn mnemonic[I]()(I) -> String where [I: Stream<Token=char>] {
         many1(alpha_num())
     }
 }
 
 parser! {
-    fn integer[I]()(I) -> i64 where [I: Stream<Item=char>] {
+    fn integer[I]()(I) -> i64 where [I: Stream<Token=char>] {
         let sign = optional(one_of("-+".chars()).skip(skip_many(char(' ')))).map(|x| match x {
             Some('-') => -1,
             _ => 1,
@@ -80,7 +79,7 @@ parser! {
 }
 
 parser! {
-    fn register[I]()(I) -> i64 where [I: Stream<Item=char>] {
+    fn register[I]()(I) -> i64 where [I: Stream<Token=char>] {
         char('r')
             .with(many1(digit()))
             .map(|x: String| x.parse::<i64>().unwrap_or(0))
@@ -88,7 +87,7 @@ parser! {
 }
 
 parser! {
-    fn operand[I]()(I) -> Operand where [I: Stream<Item=char>] {
+    fn operand[I]()(I) -> Operand where [I: Stream<Token=char>] {
         let register_operand = register().map(Operand::Register);
         let immediate = integer().map(Operand::Integer);
         let memory = between(
@@ -106,14 +105,14 @@ parser! {
 }
 
 parser! {
-    fn label[I]()(I) -> Statement where [I: Stream<Item=char>] {
+    fn label[I]()(I) -> Statement where [I: Stream<Token=char>] {
         (ident(), char(':'))
             .map(|t| Statement::Label { name: t.0 })
     }
 }
 
 parser! {
-    fn directive[I]()(I) -> Statement where [I: Stream<Item=char>] {
+    fn directive[I]()(I) -> Statement where [I: Stream<Token=char>] {
         let operands = sep_by(operand(), char(',').skip(skip_many(char(' '))));
         (char('.').with(many1(alpha_num())).skip(skip_many(char(' '))), operands)
             .map(|t| Statement::Directive { name: t.0, operands: t.1 })
@@ -121,43 +120,11 @@ parser! {
 }
 
 parser! {
-    fn instruction[I]()(I) -> Statement where [I: Stream<Item=char>] {
+    fn instruction[I]()(I) -> Statement where [I: Stream<Token=char>] {
         let operands = sep_by(operand(), char(',').skip(skip_many(char(' '))));
         (mnemonic().skip(skip_many(char(' '))), operands)
             .map(|t| Statement::Instruction { name: t.0, operands: t.1 })
     }
-}
-
-fn format_info(info: &Info<char, &str>) -> String {
-    match *info {
-        Info::Token(x) => format!("{x:?}"),
-        Info::Range(x) => format!("{x:?}"),
-        Info::Owned(ref x) => x.clone(),
-        Info::Borrowed(x) => x.to_string(),
-    }
-}
-
-fn format_error(error: &Error<char, &str>) -> String {
-    match *error {
-        Error::Unexpected(ref x) => format!("unexpected {}", format_info(x)),
-        Error::Expected(ref x) => format!("expected {}", format_info(x)),
-        Error::Message(ref x) => format_info(x),
-        Error::Other(ref x) => format!("{x:?}"),
-    }
-}
-
-fn format_parse_error(parse_error: &Errors<char, &str, SourcePosition>) -> String {
-    format!(
-        "Parse error at line {} column {}: {}",
-        parse_error.position.line,
-        parse_error.position.column,
-        parse_error
-            .errors
-            .iter()
-            .map(format_error)
-            .collect::<Vec<String>>()
-            .join(", ")
-    )
 }
 
 /// Parse a string into a list of instructions.
@@ -172,10 +139,10 @@ pub fn parse(input: &str) -> Result<Vec<Statement>, String> {
                 .skip(spaces()),
         ))
         .skip(eof())
-        .easy_parse(State::with_positioner(input, SourcePosition::default()))
+        .parse(position::Stream::with_positioner(input, SourcePosition::default()))
     {
         Ok((insts, _)) => Ok(insts),
-        Err(err) => Err(format_parse_error(&err)),
+        Err(err) => Err(format!("{}", err)),
     }
 }
 
@@ -661,10 +628,7 @@ exit
         // Unexpected end of input in a register name.
         assert_eq!(
             parse("lsh r"),
-            Err(
-                "Parse error at line 1 column 6: unexpected end of input, expected digit"
-                    .to_string()
-            )
+            Err("unexpected parse".to_string())
         );
     }
 
@@ -673,9 +637,7 @@ exit
         // Unexpected character at end of input.
         assert_eq!(
             parse("exit\n^"),
-            Err(
-                "Parse error at line 2 column 1: unexpected '^', expected letter or digit, expected '_', expected '.', expected whitespaces, expected end of input".to_string()
-            )
+            Err("unexpected parse".to_string())
         );
     }
 

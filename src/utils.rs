@@ -1,10 +1,13 @@
+//! no-std utils 
 use alloc::{fmt, vec::Vec};
 use crate::error::InternalError;
 
-/// Alternative for std::io::Write
+/// Alternative for `std::io::Write`
 pub trait Write {
+    /// Same as `std::io::Write::write`
     fn write(&mut self, buf: &[u8]) -> Result<usize, InternalError>;
 
+    /// Same as `std::io::Write::write_all`
     fn write_all(&mut self, mut buf: &[u8]) -> Result<(), InternalError> {
         while !buf.is_empty() {
             match self.write(buf) {
@@ -18,6 +21,7 @@ pub trait Write {
         Ok(())
     }
 
+    /// Same as `std::io::Write::write_fmt`
     fn write_fmt(&mut self, fmt: fmt::Arguments<'_>) -> Result<(), InternalError> {
         // Create a shim which translates a Write to a fmt::Write and saves
         // off I/O errors. instead of discarding them
