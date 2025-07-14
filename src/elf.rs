@@ -275,6 +275,11 @@ impl<C: ContextObject> Executable<C> {
         )
     }
 
+    /// Get the elf bytes
+    pub fn get_elf_bytes(&self) -> &[u8] {
+        self.elf_bytes.as_slice()
+    }
+
     /// Get the concatenated read-only sections (including the text section)
     pub fn get_ro_section(&self) -> &[u8] {
         match &self.ro_section {
