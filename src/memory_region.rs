@@ -45,7 +45,7 @@ pub fn default_memory_cow_callback(_cow_callback_payload: u32) -> Result<u64, ()
 }
 
 /// Memory region for bounds checking and address translation
-#[derive(Default, Eq, PartialEq)]
+#[derive(Default, Eq, PartialEq, Clone)]
 #[repr(C, align(32))]
 pub struct MemoryRegion {
     /// start host address

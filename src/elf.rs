@@ -235,6 +235,8 @@ pub enum Section {
 /// Elf loader/relocator
 #[derive(Debug, PartialEq)]
 pub struct Executable<C: ContextObject> {
+    /// original elf bytes:
+    original_elf_bytes: Option<Vec<u8>>,
     /// Loaded and executable elf
     elf_bytes: AlignedMemory<{ HOST_ALIGN }>,
     /// Required SBPF capabilities
@@ -277,7 +279,10 @@ impl<C: ContextObject> Executable<C> {
 
     /// Get the elf bytes
     pub fn get_elf_bytes(&self) -> &[u8] {
-        self.elf_bytes.as_slice()
+        self.original_elf_bytes
+            .as_ref()
+            .map(|v| v.as_slice())
+            .unwrap()
     }
 
     /// Get the concatenated read-only sections (including the text section)
@@ -362,6 +367,7 @@ impl<C: ContextObject> Executable<C> {
             0
         };
         Ok(Self {
+            original_elf_bytes: None,
             elf_bytes,
             sbpf_version,
             ro_section: Section::Borrowed(ebpf::MM_RODATA_START as usize, 0..text_bytes.len()),
@@ -381,6 +387,11 @@ impl<C: ContextObject> Executable<C> {
 
     /// Fully loads an ELF
     pub fn load(bytes: &[u8], loader: Arc<BuiltinProgram<C>>) -> Result<Self, ElfError> {
+        Self::load_with_backup(bytes, loader, true)
+    }
+
+    /// Fully loads an ELF with backup config
+    pub fn load_with_backup(bytes: &[u8], loader: Arc<BuiltinProgram<C>>, backup: bool) -> Result<Self, ElfError> {
         const E_FLAGS_OFFSET: usize = 48;
         let e_flags = LittleEndian::read_u32(
             bytes
@@ -413,6 +424,11 @@ impl<C: ContextObject> Executable<C> {
             Self::load_with_lenient_parser(bytes, loader)?
         };
         executable.sbpf_version = sbpf_version;
+        executable.original_elf_bytes = if backup {
+            Some(bytes.to_vec())
+        } else {
+            None
+        };
         Ok(executable)
     }
 
@@ -600,6 +616,7 @@ impl<C: ContextObject> Executable<C> {
             rodata_header.file_range().unwrap_or_default(),
         );
         Ok(Self {
+            original_elf_bytes: None,
             elf_bytes: aligned_memory,
             sbpf_version: SBPFVersion::Reserved, // Is set in Self::load()
             ro_section,
@@ -699,6 +716,7 @@ impl<C: ContextObject> Executable<C> {
         )?;
 
         Ok(Self {
+            original_elf_bytes: None,
             elf_bytes,
             sbpf_version,
             ro_section,
